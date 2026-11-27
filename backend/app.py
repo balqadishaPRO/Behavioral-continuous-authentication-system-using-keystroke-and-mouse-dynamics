@@ -12,13 +12,12 @@ from pydantic import BaseModel, Field
 
 from . import db, features, model
 
-THRESHOLD = 0.5   # risk above this counts as a suspicious window
-STREAK = 3        # this many suspicious windows in a row -> re-authenticate
-ADMINS = set(os.environ.get("BCA_ADMINS", "admin").split(","))
+THRESHOLD = 0.5
+STREAK = 3
+ADMIN_PASSWORD = os.environ.get("BCA_ADMIN_PASSWORD", "123qwe456")
 
 app = FastAPI(title="Behavioral Continuous Authentication")
 con = db.connect()
-# All endpoints are `async def` so they run on the event loop thread: one shared sqlite connection is safe.
 
 
 class Creds(BaseModel):
@@ -31,11 +30,11 @@ class Password(BaseModel):
 
 
 class Window(BaseModel):
-    keys: list[tuple[float, float]] = Field(default_factory=list, max_length=2000)          # [down_ms, up_ms]
-    moves: list[tuple[float, float, float]] = Field(default_factory=list, max_length=6000)  # [t_ms, x, y]
-    clicks: list[tuple[float, float]] = Field(default_factory=list, max_length=500)        # [down_ms, up_ms]
+    keys: list[tuple[float, float]] = Field(default_factory=list, max_length=2000)
+    moves: list[tuple[float, float, float]] = Field(default_factory=list, max_length=6000)
+    clicks: list[tuple[float, float]] = Field(default_factory=list, max_length=500)
     scrolls: int = Field(0, ge=0, le=10000)
-    impostor: bool = False  # experiment flag: someone other than the owner is using this session
+    impostor: bool = False
 
 
 def _hash(password, salt):
@@ -46,7 +45,18 @@ def _check_password(user, password):
     return secrets.compare_digest(_hash(password, user["salt"]), user["pw_hash"])
 
 
-def current(x_token: str = Header()):
+def _seed_admin():
+    # Upsert: if someone already registered "admin" in an old DB, the seeded password replaces theirs.
+    salt = secrets.token_bytes(16)
+    con.execute("INSERT INTO users (username, salt, pw_hash, created, is_admin) VALUES ('admin',?,?,?,1) "
+                "ON CONFLICT(username) DO UPDATE SET salt=excluded.salt, pw_hash=excluded.pw_hash, is_admin=1",
+                (salt, _hash(ADMIN_PASSWORD, salt), time.time()))
+
+
+_seed_admin()
+
+
+async def current(x_token: str = Header()):
     row = con.execute(  "SELECT s.token, s.locked, s.streak, u.* " \
                         "FROM sessions s " \
                         "JOIN users u ON u.id = s.user_id "
@@ -64,7 +74,6 @@ def _count(user_id, label):
 
 
 def _enroll_counts(user_id):
-    """Enrollment windows collected per modality, e.g. {"keys": 7, "mouse": 3}."""
     return {mod: con.execute(f"SELECT COUNT(*) FROM samples WHERE user_id=? AND label='enroll' AND has_{mod}=1",
                              (user_id,)).fetchone()[0] for mod in model.MIN_ENROLL}
 
@@ -77,7 +86,7 @@ def _save_sample(s, label, raw, feats):
 def _status(s):
     return {"username": s["username"], "enrolled": s["model"] is not None, "locked": bool(s["locked"]),
             "enroll_count": _enroll_counts(s["id"]), "enroll_needed": model.MIN_ENROLL,
-            "admin": s["username"] in ADMINS}
+            "admin": bool(s["is_admin"])}
 
 
 @app.post("/api/register")
@@ -125,8 +134,6 @@ async def events(w: Window, s=Depends(current)):
         return {"status": "locked"}
 
     _save_sample(s, "impostor" if w.impostor else "live", raw, f)
-    # recent windows of this session (including this one), only since the last lock, so an
-    # impostor's windows are not pooled with the owner's after re-authentication
     recent = con.execute("SELECT raw FROM (SELECT raw, t FROM samples WHERE token=? AND label!='enroll' "
                          "AND t > COALESCE((SELECT MAX(t) FROM scores WHERE token=? AND locked=1), 0) "
                          "ORDER BY t DESC LIMIT 20) ORDER BY t", (s["token"], s["token"])).fetchall()
@@ -163,7 +170,7 @@ async def reauth(p: Password, s=Depends(current)):
 
 @app.get("/api/admin")
 async def admin(s=Depends(current)):
-    if s["username"] not in ADMINS:
+    if not s["is_admin"]:
         raise HTTPException(403, "Admins only")
     if s["locked"]:
         raise HTTPException(423, "Session locked: re-authenticate first")
@@ -184,7 +191,7 @@ async def admin(s=Depends(current)):
 @app.middleware("http")
 async def no_stale_pages(request, call_next):
     response = await call_next(request)
-    response.headers["Cache-Control"] = "no-cache"  # browser re-checks files, so code updates show on refresh
+    response.headers["Cache-Control"] = "no-cache"
     return response
 
 

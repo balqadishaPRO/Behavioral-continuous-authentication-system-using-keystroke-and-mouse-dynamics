@@ -24,7 +24,7 @@ python -m venv .venv
 .venv\Scripts\python -m uvicorn backend.app:app --port 8000 --timeout-graceful-shutdown 2
 ```
 
-Open http://localhost:8000. Register the username `admin` to see the dashboard (other admin names: env `BCA_ADMINS=name1,name2`).
+Open http://localhost:8000. Log in as `admin` / `123qwe456` to see the dashboard (the account is seeded on startup; override the password with env `BCA_ADMIN_PASSWORD`).
 
 ## Data collection protocol (for the evaluation)
 1. Each person registers and does both tasks until the typing bar (15 windows) and the mouse bar (10 windows) are full, about 5 min, then clicks **Finish enrollment**. Typing and mouse get separate models; a window is scored by whichever it has enough activity for.

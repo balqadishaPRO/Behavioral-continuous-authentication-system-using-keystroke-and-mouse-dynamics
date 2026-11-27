@@ -1,29 +1,81 @@
-:root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --muted:#667085; --line:#e4e7ec;
-  --ok:#12b76a; --warn:#f79009; --bad:#d92d20; --accent:#2e5bff; }
+/* "still you?" — hand-made zine look: kraft paper, ink marker, stickers with hard shadows */
+:root { --bg:#F3E9D2; --card:#fff; --ink:#1E1B18; --muted:#6B6257; --line:#1E1B18;
+  --ok:#7FE0B5; --warn:#FFD84D; --bad:#FF4F2E; --accent:#FF4F2E; --butter:#FFD84D; --mint:#7FE0B5; --sky:#8EC9FF;
+  --hand:Caveat, cursive; }
 * { box-sizing: border-box; }
-body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
-header { display:flex; align-items:center; gap:16px; padding:12px 24px; background:var(--card); border-bottom:1px solid var(--line); }
-header h1 { font-size:16px; margin:0; flex:1; }
-main { max-width:1000px; margin:24px auto; padding:0 16px; display:grid; gap:16px; }
-.card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 20px; }
-.card h2 { font-size:15px; margin:0 0 8px; }
-.muted { color:var(--muted); font-size:13px; }
+body { margin:0; font:500 16px/1.5 Rubik, system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+a { color:var(--ink); font-weight:800; text-decoration-thickness:3px; text-underline-offset:4px; }
+a:hover { text-decoration-color:var(--accent); }
+
+header { display:flex; flex-wrap:wrap; align-items:center; gap:12px 16px; padding:16px 32px; border-bottom:3px solid var(--ink); }
+header h1 { font-size:18px; font-weight:900; margin:0; flex:1; letter-spacing:-0.01em; }
+.logo { display:inline-flex; align-items:center; gap:10px; text-decoration:none; }
+.logo svg { flex:none; transform:rotate(-6deg); }
+.logo b { font-size:26px; font-weight:900; letter-spacing:-0.04em; line-height:1; }
+.logo b span { color:var(--accent); }
+.hand { font-family:var(--hand); font-weight:700; font-size:24px; line-height:1.2; }
+
+main { max-width:1040px; margin:36px auto; padding:0 20px; display:grid; gap:28px; }
+.card { background:var(--card); border:3px solid var(--ink); border-radius:24px; padding:22px 26px; box-shadow:6px 6px 0 var(--ink); }
+.card h2 { display:inline; font-size:26px; font-weight:900; letter-spacing:-0.03em; margin:0;
+  background:linear-gradient(transparent 58%, var(--butter) 58%); padding:0 4px; }
+.card h2 + * { margin-top:12px; }
+.muted { color:var(--muted); font-size:14px; }
+
 input, textarea, button { font:inherit; }
-input, textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; }
-textarea { min-height:110px; resize:vertical; }
-button { padding:8px 14px; border:0; border-radius:6px; background:var(--accent); color:#fff; cursor:pointer; }
-button.secondary { background:#eef2ff; color:var(--accent); }
+input, textarea { width:100%; padding:10px 12px; border:3px solid var(--ink); border-radius:14px; background:#fff; color:var(--ink); }
+input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline:3px solid var(--sky); outline-offset:2px; }
+textarea { min-height:120px; resize:vertical; }
+label { font-weight:800; }
+button { min-height:48px; padding:0 22px; border:3px solid var(--ink); border-radius:16px; background:var(--accent); color:var(--ink);
+  font-weight:900; cursor:pointer; box-shadow:4px 4px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+button:active:not(:disabled) { transform:translate(4px, 4px); box-shadow:0 0 0 var(--ink); } /* pressed: shadow goes */
+button.secondary { background:#fff; }
 button:disabled { opacity:.5; cursor:not-allowed; }
-.row { display:flex; gap:8px; align-items:center; }
-.chip { padding:2px 10px; border-radius:999px; font-size:13px; background:#eef2ff; color:var(--accent); }
-.bar { height:12px; background:var(--line); border-radius:6px; overflow:hidden; }
-.bar > div { height:100%; width:0; background:var(--ok); transition:width .4s, background .4s; }
+.row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+
+.chip { display:inline-block; padding:4px 12px; border:3px solid var(--ink); border-radius:12px; font-size:14px; font-weight:900;
+  background:var(--butter); box-shadow:3px 3px 0 var(--ink); transform:rotate(-2deg); }
+.chip:nth-of-type(2n) { background:var(--mint); transform:rotate(2deg); }
+.chip.locked { background:var(--accent); }
+
+.bar { height:22px; background:var(--bg); border:3px solid var(--ink); border-radius:12px; overflow:hidden; }
+.bar > div { height:100%; width:0; background:var(--ok); border-right:3px solid var(--ink); transition:width .4s, background .4s; }
+
 table { width:100%; border-collapse:collapse; }
-th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); font-size:14px; }
-.error { color:var(--bad); min-height:1.5em; }
-.chart-legend { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px; margin-bottom:4px; }
-.chart-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
+th, td { text-align:left; padding:8px; border-bottom:2px dashed var(--ink); font-size:14px; }
+th { font-weight:900; border-bottom-style:solid; }
+.error { color:#C2290F; font-weight:800; min-height:1.5em; }
+
+.chart-legend { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:14px; margin-bottom:4px; }
+.chart-legend i { display:inline-block; width:14px; height:14px; border:2px solid var(--ink); border-radius:4px; margin-right:6px; vertical-align:-2px; }
 .chart-plot { position:relative; }
-.chart-tip { position:absolute; pointer-events:none; background:#1d2330; color:#fff; font-size:12px; line-height:1.45;
-  padding:6px 9px; border-radius:6px; min-width:150px; }
+.chart-tip { position:absolute; pointer-events:none; background:#fff; color:var(--ink); font-size:13px; line-height:1.45;
+  padding:8px 11px; border:3px solid var(--ink); border-radius:12px; box-shadow:4px 4px 0 var(--ink); min-width:150px; }
+details summary { cursor:pointer; margin-top:8px; }
 details table { margin-top:6px; }
+
+/* one-screen layouts: the page never scrolls, zones keep fixed slots so updates don't push content around */
+[hidden] { display:none !important; }
+body.fit { height:100dvh; overflow:hidden; display:flex; flex-direction:column; }
+body.fit > header { flex:none; padding-top:12px; padding-bottom:12px; }
+body.fit > main { flex:1; min-height:0; width:100%; margin:0 auto; padding:20px 24px 26px; }
+.stack { display:flex; flex-direction:column; gap:12px; }
+.stack > h2 { align-self:flex-start; }
+.stack > h2 + * { margin-top:0; }
+label input { margin-top:4px; }
+
+.signin { max-width:1000px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,420px); gap:48px; align-items:center; align-content:center; }
+.hero { margin:0; font-size:clamp(40px, 6vw, 76px); font-weight:900; line-height:.95; letter-spacing:-.04em; }
+
+@media (max-width:760px) {
+  .signin { grid-template-columns:1fr; gap:16px; }
+  .hero { font-size:36px; }
+}
+/* too small to fit everything: fall back to normal scrolling */
+@media (max-width:700px), (max-height:520px) {
+  body.fit.zoned { height:auto; overflow:visible; }
+}
+@media (max-height:560px) {
+  body.fit:not(.zoned) { height:auto; overflow:visible; }
+}

@@ -2,19 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BCA — Monitoring dashboard</title>
+<title>still you? — Monitoring dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800;900&family=Caveat:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <style>
-  .sess { padding:14px 0; border-bottom:1px solid var(--line); }
+  .sess { padding:16px 0; border-bottom:2px dashed var(--ink); }
   .sess:last-child { border-bottom:0; }
   .sess-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; margin-bottom:6px; }
 </style>
 </head>
 <body>
 <header>
+  <a class="logo" href="index.html"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="#FF4F2E" stroke="#1E1B18" stroke-width="3"/><path d="M11 21a11 11 0 0 1 22 0M14 27a8 8 0 0 1 16 0M18 29a4 4 0 0 1 8 0M22 28v6" fill="none" stroke="#1E1B18" stroke-width="2.6" stroke-linecap="round"/></svg><b>still you<span>?</span></b></a>
   <h1>Monitoring dashboard</h1>
   <a href="app.html">Back to session</a>
-  <span class="muted">Refreshes every 5 s</span>
+  <span class="hand">refreshes every 5 s</span>
 </header>
 <main>
   <section class="card">
@@ -42,14 +45,14 @@ async function load() {
   $('users').innerHTML = d.users.map(u => `<tr><td>${esc(u.username)}</td><td>${u.enrolled ? 'trained' : 'enrolling'}</td>
     <td>${u.enroll}</td><td>${u.live}</td><td>${u.impostor}</td></tr>`).join('');
   const key = JSON.stringify(d.sessions);
-  if (key === lastSessions) return;  // unchanged: keep open data tables and tooltips as they are
+  if (key === lastSessions) return;
   lastSessions = key;
   const pts = sc => sc.map(p => ({ ...p, locked: !!p.locked }));
   $('sessions').innerHTML = d.sessions.map((s, i) => {
     const sus = s.scores.filter(p => p.risk > d.threshold).length;
     return `<div class="sess"><div class="sess-head"><strong>${esc(s.username)}</strong>
       <span class="muted">session ${esc(s.id)} · started ${new Date(s.created * 1000).toLocaleTimeString()}</span>
-      ${s.locked ? '<span class="chip" style="color:#d92d20">🔒 locked</span>' : '<span class="chip">active</span>'}
+      ${s.locked ? '<span class="chip locked">locked</span>' : '<span class="chip">active</span>'}
       <span class="muted">${s.scores.length} windows · ${sus} suspicious (${Math.round(100 * sus / s.scores.length)}%) ·
       last risk ${Math.round(s.scores.at(-1).risk * 100)}%</span></div><div id="chart${i}"></div></div>`;
   }).join('') || '<p class="muted">No monitored sessions yet.</p>';
