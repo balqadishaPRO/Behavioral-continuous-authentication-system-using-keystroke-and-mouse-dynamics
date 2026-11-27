@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BCA — Monitoring dashboard</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .sess { padding:14px 0; border-bottom:1px solid var(--line); }
+  .sess:last-child { border-bottom:0; }
+  .sess-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; margin-bottom:6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Monitoring dashboard</h1>
+  <a href="app.html">Back to session</a>
+  <span class="muted">Refreshes every 5 s</span>
+</header>
+<main>
+  <section class="card">
+    <h2>Users</h2>
+    <table><thead><tr><th>User</th><th>Model</th><th>Enroll windows</th><th>Live windows</th><th>Impostor-labelled windows</th></tr></thead>
+    <tbody id="users"></tbody></table>
+  </section>
+  <section class="card">
+    <h2>Sessions: risk per 10 s window</h2>
+    <p class="muted">Each bar is one 10-second window of activity. Hover a bar for the typing and mouse breakdown.</p>
+    <div id="sessions"></div>
+  </section>
+  <p class="error" id="err"></p>
+</main>
+<script src="chart.js"></script>
+<script>
+let lastSessions = '';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function load() {
+  const r = await fetch('/api/admin', { headers: { 'X-Token': localStorage.token || '' } });
+  if (!r.ok) { $('err').textContent = { 403: 'Log in as an admin user (default username: admin) to see the dashboard.', 423: 'This session is locked. Re-authenticate on the session page first.' }[r.status] || 'Please log in first.'; $('sessions').innerHTML = ''; lastSessions = ''; return; }
+  const d = await r.json();
+  $('users').innerHTML = d.users.map(u => `<tr><td>${esc(u.username)}</td><td>${u.enrolled ? 'trained' : 'enrolling'}</td>
+    <td>${u.enroll}</td><td>${u.live}</td><td>${u.impostor}</td></tr>`).join('');
+  const key = JSON.stringify(d.sessions);
+  if (key === lastSessions) return;  // unchanged: keep open data tables and tooltips as they are
+  lastSessions = key;
+  const pts = sc => sc.map(p => ({ ...p, locked: !!p.locked }));
+  $('sessions').innerHTML = d.sessions.map((s, i) => {
+    const sus = s.scores.filter(p => p.risk > d.threshold).length;
+    return `<div class="sess"><div class="sess-head"><strong>${esc(s.username)}</strong>
+      <span class="muted">session ${esc(s.id)} · started ${new Date(s.created * 1000).toLocaleTimeString()}</span>
+      ${s.locked ? '<span class="chip" style="color:#d92d20">🔒 locked</span>' : '<span class="chip">active</span>'}
+      <span class="muted">${s.scores.length} windows · ${sus} suspicious (${Math.round(100 * sus / s.scores.length)}%) ·
+      last risk ${Math.round(s.scores.at(-1).risk * 100)}%</span></div><div id="chart${i}"></div></div>`;
+  }).join('') || '<p class="muted">No monitored sessions yet.</p>';
+  d.sessions.forEach((s, i) => riskChart($('chart' + i), pts(s.scores), d.threshold));
+}
+load(); setInterval(load, 5000);
+</script>
+</body>
+</html>
