@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BCA — Session</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  #targetArea { position:relative; height:260px; background:#f9fafb; border:1px dashed var(--line); border-radius:8px; }
+  #target { position:absolute; width:36px; height:36px; border-radius:50%; background:var(--accent); border:0; padding:0; }
+  #overlay { position:fixed; inset:0; background:rgba(16,24,40,.7); display:none; place-items:center; }
+  #overlay .card { width:360px; }
+  #passage { font:17px/1.7 ui-monospace, "Cascadia Mono", Consolas, monospace; background:#f9fafb;
+             border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:8px 0; }
+  #passage .ok { color:var(--ok); }
+  #passage .bad { color:#fff; background:var(--bad); border-radius:2px; }
+  #passage .cur { border-bottom:2px solid var(--accent); }
+  #passage .todo { color:var(--muted); }
+  .stats { display:flex; gap:20px; font-size:14px; }
+  .stats b { font-variant-numeric: tabular-nums; }
+  .progress { display:grid; grid-template-columns: 140px 1fr 170px; gap:12px; align-items:center; margin:6px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Behavioral Continuous Authentication</h1>
+  <span class="chip" id="who"></span>
+  <span class="chip" id="mode">…</span>
+  <a href="admin.html" id="adminLink" hidden>Dashboard</a>
+  <button class="secondary" id="logout">Log out</button>
+</header>
+<main>
+  <section class="card" id="enrollCard" hidden>
+    <h2>Enrollment: building your behavioral profile</h2>
+    <p class="muted">The system learns your typing rhythm and your mouse movement separately. Every 10 seconds of
+      activity counts as one window. Type the passages (Task 1) and click the targets (Task 2) until both bars are full.</p>
+    <div class="progress"><span>Typing windows</span><div class="bar"><div id="keysBar"></div></div><span id="keysText"></span></div>
+    <div class="progress"><span>Mouse windows</span><div class="bar"><div id="mouseBar"></div></div><span id="mouseText"></span></div>
+    <p class="muted" id="enrollHint"></p>
+    <button id="finish" disabled>Finish enrollment and train my models</button>
+  </section>
+
+  <section class="card" id="riskCard" hidden>
+    <h2>Live risk score</h2>
+    <div class="bar"><div id="riskBar"></div></div>
+    <p id="riskText" aria-live="polite">Waiting for the first active window…</p>
+    <div id="riskChart"></div>
+    <label class="row muted"><input type="checkbox" id="impostor" style="width:auto">
+      Experiment mode: someone other than the account owner is using this session (labels the data for evaluation)</label>
+  </section>
+
+  <section class="card">
+    <h2>Task 1: Typing test</h2>
+    <p class="muted">Type the passage exactly as shown. Only key press and release <em>timings</em> are sent;
+      the text itself never leaves this page. Pasting is disabled.</p>
+    <div id="passage" aria-label="Passage to type"></div>
+    <textarea id="typing" aria-label="Type the passage here" spellcheck="false" autocomplete="off"></textarea>
+    <div class="stats">
+      <span>Passage <b id="pNum"></b></span>
+      <span>Speed <b id="wpm">0</b> WPM</span>
+      <span>Accuracy <b id="acc">100</b>%</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Task 2: Mouse</h2>
+    <p class="muted">Click the blue circle each time it moves. Hits: <span id="hits">0</span></p>
+    <div id="targetArea"><button id="target" aria-label="Target"></button></div>
+  </section>
+</main>
+
+<div id="overlay" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
+  <form class="card" id="reauthForm">
+    <h2 id="lockTitle">Please confirm it's you</h2>
+    <p class="muted">Your recent typing and mouse behavior did not match your profile.</p>
+    <input type="password" id="pw" placeholder="Password" autocomplete="current-password">
+    <p class="error" id="lockErr"></p>
+    <button type="submit">Re-authenticate</button>
+  </form>
+</div>
+
+<script src="chart.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const token = localStorage.token;
+if (!token) location.href = 'index.html';
+const api = (url, body) => fetch(url, { method: body === undefined ? 'GET' : 'POST',
+  headers: { 'Content-Type': 'application/json', 'X-Token': token }, body: body && JSON.stringify(body) })
+  .then(async r => { if (r.status === 401 && url !== '/api/reauth') { localStorage.removeItem('token'); location.href = 'index.html'; } return r; });
+
+// ---- Task 1: typing test (all text stays in the browser) ----
+const PASSAGES = [
+  'Every morning the small bakery on the corner opens its doors at seven. The smell of fresh bread drifts down the street, and people stop on their way to work. Some buy a warm loaf, others just a coffee, but almost everyone leaves with a little more energy for the day ahead.',
+  'Learning to play a musical instrument takes patience. At first your fingers feel slow and clumsy, and every song sounds wrong. After a few weeks of practice, simple melodies start to flow, and one day you notice that you are playing without thinking about each note.',
+  'A good password is long and hard to guess, but it only protects the moment you log in. If you walk away from an unlocked computer, anyone can sit down and continue your session. This project tries to notice that change by watching how the keyboard and mouse are used.',
+  'The mountains near the city are covered with snow for most of the winter. On clear weekends families drive up to walk in the fresh air, children throw snowballs, and friends share hot tea from a flask while they look down at the valley and the roofs below.',
+  'When a team works on a large project, clear communication matters as much as technical skill. Short daily updates, honest estimates and a shared task board help everyone understand what is done, what is blocked and what should happen next before the deadline.',
+];
+const typing = $('typing');
+let pIdx = 0, pStart = null;
+function renderPassage() {
+  const p = PASSAGES[pIdx % PASSAGES.length], typed = typing.value, frag = document.createDocumentFragment();
+  let correct = 0;
+  for (let i = 0; i < p.length; i++) {
+    const span = document.createElement('span');
+    span.textContent = p[i];
+    if (i < typed.length) { const ok = typed[i] === p[i]; correct += ok; span.className = ok ? 'ok' : 'bad'; }
+    else span.className = i === typed.length ? 'cur todo' : 'todo';
+    frag.appendChild(span);
+  }
+  $('passage').replaceChildren(frag);
+  $('pNum').textContent = `${pIdx % PASSAGES.length + 1} / ${PASSAGES.length}`;
+  const mins = pStart ? (performance.now() - pStart) / 60000 : 0;
+  $('wpm').textContent = mins > 0.05 ? Math.round(correct / 5 / mins) : 0;
+  $('acc').textContent = typed.length ? Math.round(100 * correct / typed.length) : 100;
+}
+typing.addEventListener('input', () => {
+  if (!pStart) pStart = performance.now();
+  if (typing.value.length >= PASSAGES[pIdx % PASSAGES.length].length) { pIdx++; typing.value = ''; pStart = null; }
+  renderPassage();
+});
+typing.addEventListener('paste', e => e.preventDefault());
+renderPassage();
+
+// ---- Task 2: mouse targets ----
+const area = $('targetArea'), target = $('target');
+function moveTarget() {
+  target.style.left = Math.random() * (area.clientWidth - 36) + 'px';
+  target.style.top = Math.random() * (area.clientHeight - 36) + 'px';
+}
+target.onclick = () => { $('hits').textContent = +$('hits').textContent + 1; moveTarget(); };
+moveTarget();
+
+// ---- collector: timings only; e.code is a transient map key and is never sent ----
+const fresh = () => ({ keys: [], moves: [], clicks: [], scrolls: 0 });
+let W = fresh(), paused = false;
+const keyDown = {}; let mouseDown = null;
+const now = () => Math.round(performance.now());
+addEventListener('keydown', e => { if (!paused && !e.repeat && !(e.code in keyDown)) keyDown[e.code] = now(); }, true);
+addEventListener('keyup', e => { if (e.code in keyDown) { if (!paused) W.keys.push([keyDown[e.code], now()]); delete keyDown[e.code]; } }, true);
+addEventListener('mousemove', e => { if (!paused && W.moves.length < 6000) W.moves.push([now(), e.clientX, e.clientY]); }, true);
+addEventListener('mousedown', () => { mouseDown = now(); }, true);
+addEventListener('mouseup', () => { if (!paused && mouseDown !== null && W.clicks.length < 500) W.clicks.push([mouseDown, now()]); mouseDown = null; }, true);
+addEventListener('wheel', () => { if (!paused) W.scrolls++; }, { capture: true, passive: true });
+
+const history = [];
+async function send() {
+  const w = W; W = fresh();
+  if (paused) return;
+  w.impostor = $('impostor').checked;
+  const r = await api('/api/events', w);
+  if (!r.ok) return;
+  const j = await r.json();
+  if (j.status === 'enrolling') showEnroll(j.count, j.needed);
+  else if (j.status === 'locked') { if (j.risk !== undefined) showRisk(j); lock(); }
+  else if (j.status === 'ok') showRisk(j);
+}
+setInterval(send, 10000);  // keep in sync with WINDOW_S in backend/features.py
+
+function showEnroll(count, needed) {
+  for (const [mod, label] of [['keys', 'type the passage'], ['mouse', 'click the targets']]) {
+    const n = Math.min(count[mod], needed[mod]);
+    $(mod + 'Bar').style.width = 100 * n / needed[mod] + '%';
+    $(mod + 'Text').textContent = `${count[mod]} / ${needed[mod]}` + (n < needed[mod] ? ` (${label})` : ' ✓');
+  }
+  const done = count.keys >= needed.keys && count.mouse >= needed.mouse;
+  $('enrollHint').textContent = done ? 'Both profiles have enough data. More windows give a better profile.' :
+    'A window counts for typing if you pressed 10+ keys in it, and for mouse if you moved the mouse for about 1.5 s or more.';
+  $('finish').disabled = !done;
+}
+function showRisk(j) {
+  const pct = Math.round(j.risk * 100), bar = $('riskBar');
+  bar.style.width = pct + '%';
+  bar.style.background = j.risk > 0.5 ? 'var(--bad)' : j.risk > 0.3 ? 'var(--warn)' : 'var(--ok)';
+  const part = mod => j.parts[mod] === undefined ? 'no data' : Math.round(j.parts[mod] * 100) + '%';
+  $('riskText').textContent = `Risk ${pct}% (typing ${part('keys')}, mouse ${part('mouse')}) · ` +
+    `suspicious windows in a row: ${j.streak} / ${j.streak_limit}`;
+  history.push({ t: Date.now() / 1000, risk: j.risk, keys: j.parts.keys, mouse: j.parts.mouse, locked: j.status === 'locked' });
+  if (history.length > 60) history.shift();  // last ~10 min of activity
+  riskChart($('riskChart'), history, 0.5);
+}
+function lock() { paused = true; $('overlay').style.display = 'grid'; $('pw').focus(); }
+
+$('reauthForm').onsubmit = async e => {
+  e.preventDefault();
+  const r = await api('/api/reauth', { password: $('pw').value });
+  if (!r.ok) return $('lockErr').textContent = 'Wrong password';
+  $('pw').value = ''; $('lockErr').textContent = '';
+  $('overlay').style.display = 'none';
+  W = fresh(); paused = false;
+};
+$('finish').onclick = async () => {
+  $('finish').disabled = true; $('finish').textContent = 'Training…';
+  const r = await api('/api/enroll/finish', {});
+  if (r.ok) setMode(true); else { $('finish').textContent = (await r.json()).detail; }
+};
+$('logout').onclick = async () => { await api('/api/logout', {}); localStorage.removeItem('token'); location.href = 'index.html'; };
+
+function setMode(enrolled) {
+  $('enrollCard').hidden = enrolled; $('riskCard').hidden = !enrolled;
+  $('mode').textContent = enrolled ? 'Monitoring' : 'Enrolling';
+}
+api('/api/me').then(r => r.json()).then(s => {
+  $('who').textContent = s.username;
+  $('adminLink').hidden = !s.admin;
+  setMode(s.enrolled);
+  showEnroll(s.enroll_count, s.enroll_needed);
+  if (s.locked) lock();
+});
+</script>
+</body>
+</html>

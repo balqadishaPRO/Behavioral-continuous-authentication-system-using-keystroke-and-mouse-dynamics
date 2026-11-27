@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BCA — Sign in</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><h1>Behavioral Continuous Authentication</h1></header>
+<main style="max-width:420px">
+  <form class="card" id="form">
+    <h2>Sign in</h2>
+    <p class="muted">After you sign in, the system keeps checking that the same person is still using the session, based on typing rhythm and mouse movement.</p>
+    <label>Username <input id="u" autocomplete="username" required></label>
+    <p></p>
+    <label>Password <input id="p" type="password" autocomplete="current-password" required></label>
+    <p class="error" id="err" role="alert"></p>
+    <div class="row">
+      <button type="submit">Log in</button>
+      <button type="button" class="secondary" id="reg">Register</button>
+    </div>
+  </form>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const body = () => JSON.stringify({ username: $('u').value, password: $('p').value });
+const post = (url) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body() });
+const err = async r => { const j = await r.json(); return typeof j.detail === 'string' ? j.detail : 'Username: 3+ letters/digits, password: 6+ characters'; };
+
+async function login() {
+  const r = await post('/api/login');
+  if (!r.ok) return $('err').textContent = await err(r);
+  localStorage.token = (await r.json()).token;
+  location.href = 'app.html';
+}
+$('form').onsubmit = e => { e.preventDefault(); login(); };
+$('reg').onclick = async () => {
+  const r = await post('/api/register');
+  if (!r.ok) return $('err').textContent = await err(r);
+  login();
+};
+</script>
+</body>
+</html>
