@@ -2,22 +2,28 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BCA — Sign in</title>
+<title>still you? — Sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800;900&family=Caveat:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
-<header><h1>Behavioral Continuous Authentication</h1></header>
-<main style="max-width:420px">
-  <form class="card" id="form">
+<body class="fit">
+<header><a class="logo" href="index.html"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="#FF4F2E" stroke="#1E1B18" stroke-width="3"/><path d="M11 21a11 11 0 0 1 22 0M14 27a8 8 0 0 1 16 0M18 29a4 4 0 0 1 8 0M22 28v6" fill="none" stroke="#1E1B18" stroke-width="2.6" stroke-linecap="round"/></svg><b>still you<span>?</span></b></a><h1></h1><span class="hand">continuous authentication, made by people</span></header>
+<main class="signin">
+  <div>
+    <p class="hero">Log in once.<br>We keep checking.</p>
+    <svg aria-hidden="true" width="100%" height="18" style="max-width:420px" viewBox="0 0 760 30"><path d="M6 18 C 80 6, 150 26, 230 14 S 380 8, 460 20 S 620 10, 754 14" stroke="#FF4F2E" stroke-width="10" fill="none" stroke-linecap="round"/></svg>
+  </div>
+  <form class="card stack" id="form">
     <h2>Sign in</h2>
-    <p class="muted">After you sign in, the system keeps checking that the same person is still using the session, based on typing rhythm and mouse movement.</p>
+    <p class="muted" style="margin:0">After you sign in, the system keeps checking that the same person is still using the session, based on typing rhythm and mouse movement.</p>
     <label>Username <input id="u" autocomplete="username" required></label>
-    <p></p>
     <label>Password <input id="p" type="password" autocomplete="current-password" required></label>
-    <p class="error" id="err" role="alert"></p>
+    <p class="error" id="err" role="alert" style="margin:0"></p>
     <div class="row">
       <button type="submit">Log in</button>
       <button type="button" class="secondary" id="reg">Register</button>
+      <span class="hand">new here? hit register</span>
     </div>
   </form>
 </main>

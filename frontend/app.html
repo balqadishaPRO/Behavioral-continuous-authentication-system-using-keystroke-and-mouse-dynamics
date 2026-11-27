@@ -2,70 +2,91 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BCA — Session</title>
+<title>still you? — Session</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800;900&family=Caveat:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <style>
-  #targetArea { position:relative; height:260px; background:#f9fafb; border:1px dashed var(--line); border-radius:8px; }
-  #target { position:absolute; width:36px; height:36px; border-radius:50%; background:var(--accent); border:0; padding:0; }
-  #overlay { position:fixed; inset:0; background:rgba(16,24,40,.7); display:none; place-items:center; }
-  #overlay .card { width:360px; }
-  #passage { font:17px/1.7 ui-monospace, "Cascadia Mono", Consolas, monospace; background:#f9fafb;
-             border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:8px 0; }
-  #passage .ok { color:var(--ok); }
-  #passage .bad { color:#fff; background:var(--bad); border-radius:2px; }
-  #passage .cur { border-bottom:2px solid var(--accent); }
+  #targetArea { position:relative; flex:1; min-height:90px; background:var(--bg); border:3px dashed var(--ink); border-radius:18px; }
+  #target { position:absolute; width:36px; height:36px; min-height:0; border-radius:50%; background:var(--accent); border:3px solid var(--ink); box-shadow:3px 3px 0 var(--ink); padding:0; }
+  #overlay { position:fixed; inset:0; background:rgba(30,27,24,.75); display:none; place-items:center; }
+  #overlay .card { width:380px; transform:rotate(-1deg); }
+  #overlay input { margin:12px 0 4px; }
+  #passage { font:15px/1.6 ui-monospace, "Cascadia Mono", Consolas, monospace; background:var(--bg);
+             border:3px solid var(--ink); border-radius:16px; padding:10px 14px; }
+  #passage .ok { color:#0C7A4E; }
+  #passage .bad { color:var(--ink); background:var(--bad); border-radius:2px; }
+  #passage .cur { border-bottom:3px solid var(--accent); }
   #passage .todo { color:var(--muted); }
-  .stats { display:flex; gap:20px; font-size:14px; }
+  .stats { display:flex; flex-wrap:wrap; gap:20px; font-size:14px; }
   .stats b { font-variant-numeric: tabular-nums; }
-  .progress { display:grid; grid-template-columns: 140px 1fr 170px; gap:12px; align-items:center; margin:6px 0; }
+  .progress { display:grid; grid-template-columns:1fr auto; gap:6px 12px; align-items:center; margin:0; font-weight:800; }
+  .progress .bar { grid-column:1 / -1; order:3; }
+  /* two zones side by side: tasks left, status right; each card has a fixed slot, so live updates never shift the page */
+  .zones { max-width:1440px; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr); gap:24px; }
+  .zone { display:flex; flex-direction:column; gap:20px; min-height:0; }
+  .zone .card { padding:16px 22px; }
+  .zone > .card { min-height:0; }
+  .stack > p { margin:0; }
+  #typingCard { flex:none; }
+  #typing { min-height:0; height:64px; resize:none; }
+  #mouseCard, #enrollCard, #riskCard { flex:1; }
+  #riskText, #enrollHint { min-height:3em; }
+  #riskChart { flex:1; min-height:0; overflow:auto; }
+  #riskCard > label { margin-top:auto; display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start; }
+  @media (max-width:700px) { .zones { grid-template-columns:1fr; grid-template-rows:none; } #mouseCard { min-height:320px; } }
 </style>
 </head>
-<body>
+<body class="fit zoned">
 <header>
-  <h1>Behavioral Continuous Authentication</h1>
+  <a class="logo" href="index.html"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="#FF4F2E" stroke="#1E1B18" stroke-width="3"/><path d="M11 21a11 11 0 0 1 22 0M14 27a8 8 0 0 1 16 0M18 29a4 4 0 0 1 8 0M22 28v6" fill="none" stroke="#1E1B18" stroke-width="2.6" stroke-linecap="round"/></svg><b>still you<span>?</span></b></a>
+  <h1></h1>
   <span class="chip" id="who"></span>
   <span class="chip" id="mode">…</span>
   <a href="admin.html" id="adminLink" hidden>Dashboard</a>
   <button class="secondary" id="logout">Log out</button>
 </header>
-<main>
-  <section class="card" id="enrollCard" hidden>
-    <h2>Enrollment: building your behavioral profile</h2>
-    <p class="muted">The system learns your typing rhythm and your mouse movement separately. Every 10 seconds of
-      activity counts as one window. Type the passages (Task 1) and click the targets (Task 2) until both bars are full.</p>
-    <div class="progress"><span>Typing windows</span><div class="bar"><div id="keysBar"></div></div><span id="keysText"></span></div>
-    <div class="progress"><span>Mouse windows</span><div class="bar"><div id="mouseBar"></div></div><span id="mouseText"></span></div>
-    <p class="muted" id="enrollHint"></p>
-    <button id="finish" disabled>Finish enrollment and train my models</button>
-  </section>
+<main class="zones">
+  <div class="zone">
+    <section class="card stack" id="typingCard">
+      <h2>Task 1: Typing test</h2>
+      <p class="muted">Type the passage exactly. Only key <em>timings</em> are sent, never the text. Pasting is off.</p>
+      <div id="passage" aria-label="Passage to type"></div>
+      <textarea id="typing" aria-label="Type the passage here" spellcheck="false" autocomplete="off"></textarea>
+      <div class="stats">
+        <span>Passage <b id="pNum"></b></span>
+        <span>Speed <b id="wpm">0</b> WPM</span>
+        <span>Accuracy <b id="acc">100</b>%</span>
+      </div>
+    </section>
 
-  <section class="card" id="riskCard" hidden>
-    <h2>Live risk score</h2>
-    <div class="bar"><div id="riskBar"></div></div>
-    <p id="riskText" aria-live="polite">Waiting for the first active window…</p>
-    <div id="riskChart"></div>
-    <label class="row muted"><input type="checkbox" id="impostor" style="width:auto">
-      Experiment mode: someone other than the account owner is using this session (labels the data for evaluation)</label>
-  </section>
+    <section class="card stack" id="mouseCard">
+      <h2>Task 2: Mouse</h2>
+      <p class="muted">Click the red sticker each time it moves. Hits: <span id="hits">0</span></p>
+      <div id="targetArea"><button id="target" aria-label="Target"></button></div>
+    </section>
+  </div>
 
-  <section class="card">
-    <h2>Task 1: Typing test</h2>
-    <p class="muted">Type the passage exactly as shown. Only key press and release <em>timings</em> are sent;
-      the text itself never leaves this page. Pasting is disabled.</p>
-    <div id="passage" aria-label="Passage to type"></div>
-    <textarea id="typing" aria-label="Type the passage here" spellcheck="false" autocomplete="off"></textarea>
-    <div class="stats">
-      <span>Passage <b id="pNum"></b></span>
-      <span>Speed <b id="wpm">0</b> WPM</span>
-      <span>Accuracy <b id="acc">100</b>%</span>
-    </div>
-  </section>
+  <div class="zone">
+    <section class="card stack" id="enrollCard" hidden>
+      <h2>Building your profile</h2>
+      <p class="muted">The system learns your typing rhythm and your mouse movement separately. Every 10 seconds of
+        activity counts as one window. Type the passages (Task 1) and click the targets (Task 2) until both bars are full.</p>
+      <div class="progress"><span>Typing windows</span><div class="bar"><div id="keysBar"></div></div><span id="keysText"></span></div>
+      <div class="progress"><span>Mouse windows</span><div class="bar"><div id="mouseBar"></div></div><span id="mouseText"></span></div>
+      <p class="muted" id="enrollHint"></p>
+      <button id="finish" disabled>Finish and train my models</button>
+    </section>
 
-  <section class="card">
-    <h2>Task 2: Mouse</h2>
-    <p class="muted">Click the blue circle each time it moves. Hits: <span id="hits">0</span></p>
-    <div id="targetArea"><button id="target" aria-label="Target"></button></div>
-  </section>
+    <section class="card stack" id="riskCard" hidden>
+      <h2>Live risk score</h2>
+      <div class="bar"><div id="riskBar"></div></div>
+      <p id="riskText" aria-live="polite">Waiting for the first active window…</p>
+      <div id="riskChart" class="fill"></div>
+      <label class="muted"><input type="checkbox" id="impostor" style="width:auto;margin:0">
+        Experiment mode: someone other than the account owner is using this session (labels the data for evaluation)</label>
+    </section>
+  </div>
 </main>
 
 <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
@@ -87,7 +108,6 @@ const api = (url, body) => fetch(url, { method: body === undefined ? 'GET' : 'PO
   headers: { 'Content-Type': 'application/json', 'X-Token': token }, body: body && JSON.stringify(body) })
   .then(async r => { if (r.status === 401 && url !== '/api/reauth') { localStorage.removeItem('token'); location.href = 'index.html'; } return r; });
 
-// ---- Task 1: typing test (all text stays in the browser) ----
 const PASSAGES = [
   'Every morning the small bakery on the corner opens its doors at seven. The smell of fresh bread drifts down the street, and people stop on their way to work. Some buy a warm loaf, others just a coffee, but almost everyone leaves with a little more energy for the day ahead.',
   'Learning to play a musical instrument takes patience. At first your fingers feel slow and clumsy, and every song sounds wrong. After a few weeks of practice, simple melodies start to flow, and one day you notice that you are playing without thinking about each note.',
@@ -121,7 +141,6 @@ typing.addEventListener('input', () => {
 typing.addEventListener('paste', e => e.preventDefault());
 renderPassage();
 
-// ---- Task 2: mouse targets ----
 const area = $('targetArea'), target = $('target');
 function moveTarget() {
   target.style.left = Math.random() * (area.clientWidth - 36) + 'px';
@@ -130,7 +149,6 @@ function moveTarget() {
 target.onclick = () => { $('hits').textContent = +$('hits').textContent + 1; moveTarget(); };
 moveTarget();
 
-// ---- collector: timings only; e.code is a transient map key and is never sent ----
 const fresh = () => ({ keys: [], moves: [], clicks: [], scrolls: 0 });
 let W = fresh(), paused = false;
 const keyDown = {}; let mouseDown = null;
@@ -154,7 +172,7 @@ async function send() {
   else if (j.status === 'locked') { if (j.risk !== undefined) showRisk(j); lock(); }
   else if (j.status === 'ok') showRisk(j);
 }
-setInterval(send, 10000);  // keep in sync with WINDOW_S in backend/features.py
+setInterval(send, 10000);
 
 function showEnroll(count, needed) {
   for (const [mod, label] of [['keys', 'type the passage'], ['mouse', 'click the targets']]) {
@@ -175,7 +193,7 @@ function showRisk(j) {
   $('riskText').textContent = `Risk ${pct}% (typing ${part('keys')}, mouse ${part('mouse')}) · ` +
     `suspicious windows in a row: ${j.streak} / ${j.streak_limit}`;
   history.push({ t: Date.now() / 1000, risk: j.risk, keys: j.parts.keys, mouse: j.parts.mouse, locked: j.status === 'locked' });
-  if (history.length > 60) history.shift();  // last ~10 min of activity
+  if (history.length > 60) history.shift();
   riskChart($('riskChart'), history, 0.5);
 }
 function lock() { paused = true; $('overlay').style.display = 'grid'; $('pw').focus(); }

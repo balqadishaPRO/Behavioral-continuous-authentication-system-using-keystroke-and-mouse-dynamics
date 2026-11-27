@@ -1,13 +1,3 @@
-"""Offline evaluation on the windows collected by the app.
-
-For every enrolled user: train on their enrollment windows only, then score
-  genuine  = the user's own 'live' windows
-  impostor = every other user's windows + windows labelled 'impostor' in this user's sessions.
-Reports FAR / FRR at the app's threshold, EER, and detection delay of the 3-in-a-row lock rule,
-for IsolationForest, One-Class SVM and LOF, using typing only, mouse only, and both combined.
-
-Run from the repo root:  python -m eval.evaluate
-"""
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -23,7 +13,7 @@ SETUPS = {"keys": ("keys",), "mouse": ("mouse",), "both": features.MODALITIES}
 
 
 def load():
-    data = defaultdict(lambda: defaultdict(list))  # user -> label -> [raw windows] in time order
+    data = defaultdict(lambda: defaultdict(list))
     con = db.connect()
     for r in con.execute("SELECT u.username, s.label, s.raw FROM samples s JOIN users u ON u.id = s.user_id ORDER BY s.t"):
         w = json.loads(r["raw"])
@@ -33,7 +23,6 @@ def load():
 
 
 def windows_to_lock(risks):
-    """Index (1-based) of the window where the lock rule fires, or None."""
     streak = 0
     for i, r in enumerate(risks, 1):
         streak = streak + 1 if r > THRESHOLD else 0
@@ -44,7 +33,6 @@ def windows_to_lock(risks):
 
 def evaluate(data, algo, mods=features.MODALITIES):
     def score(models, windows):
-        """Score a sequence of raw windows the way the app does (pooled per modality)."""
         risks = (model.window_risk(models, {m: d[m] for m in mods if m in d})[0] for d in features.rolling(windows))
         return [r for r in risks if r is not None]
 
@@ -74,8 +62,8 @@ def evaluate(data, algo, mods=features.MODALITIES):
     if not n_users or not imp:
         return None
     gen, imp = np.array(gen), np.array(imp)
-    frr = np.array([(gen > t).mean() for t in GRID])   # owner flagged
-    far = np.array([(imp <= t).mean() for t in GRID])  # impostor accepted
+    frr = np.array([(gen > t).mean() for t in GRID])
+    far = np.array([(imp <= t).mean() for t in GRID])
     i = np.argmin(np.abs(far - frr))
     return {"users": n_users, "genuine_windows": len(gen), "impostor_windows": len(imp),
             "FAR@thr": float((imp <= THRESHOLD).mean()), "FRR@thr": float((gen > THRESHOLD).mean()),

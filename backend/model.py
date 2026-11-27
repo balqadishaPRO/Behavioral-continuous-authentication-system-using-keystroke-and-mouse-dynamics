@@ -1,4 +1,3 @@
-"""Per-user one-class models, one per modality, trained only on the owner's enrollment windows."""
 import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.model_selection import KFold
@@ -14,7 +13,7 @@ ALGOS = {
     "ocsvm": lambda: OneClassSVM(nu=0.1, gamma="scale"),
     "lof": lambda: LocalOutlierFactor(n_neighbors=5, novelty=True),
 }
-MIN_ENROLL = {"keys": 15, "mouse": 10}  # windows needed per modality before training
+MIN_ENROLL = {"keys": 15, "mouse": 10}
 
 
 def _fit(X, algo):
@@ -22,8 +21,6 @@ def _fit(X, algo):
 
 
 def train(X, algo="iforest"):
-    """Fit on all enrollment windows; calibrate risk on out-of-fold scores so the
-    owner's own windows aren't judged by a model that has already seen them."""
     X = np.asarray(X, float)
     folds = KFold(5, shuffle=True, random_state=0).split(X)
     oof = np.concatenate([_fit(X[tr], algo).decision_function(X[te]) for tr, te in folds])
@@ -32,19 +29,16 @@ def train(X, algo="iforest"):
 
 
 def train_user(windows, algo="iforest", modalities=MIN_ENROLL):
-    """windows: raw enrollment windows in time order -> {modality: model} on pooled features."""
     pooled = features.rolling(windows)
     return {mod: train([d[mod] for d in pooled if mod in d], algo) for mod in modalities}
 
 
 def risk(m, x):
-    """0 = typical for the owner (median), 0.5 = as unusual as the owner's worst 5%, 1 = far beyond."""
     s = m["pipe"].decision_function(np.asarray([x], float))[0]
     span = max(m["median"] - m["p5"], 1e-9)
     return float(np.clip((m["median"] - s) / span / 2, 0, 1))
 
 
 def window_risk(models, feats):
-    """Per-modality risks for the modalities present in this window, and their mean (None if none)."""
     parts = {mod: risk(models[mod], x) for mod, x in feats.items() if mod in models}
     return (sum(parts.values()) / len(parts) if parts else None), parts
